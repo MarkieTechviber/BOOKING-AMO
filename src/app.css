@@ -1,0 +1,95 @@
+/* BOOKING-AMO - Warm Amber Library Circulation Design System */
+:root {
+  --color-amber-primary: #D97706;
+  --color-amber-hover: #B45309;
+  --color-amber-light: #FEF3C7;
+  --color-amber-surface: #FFFBEB;
+  --color-amber-border: #FDE68A;
+  
+  --color-bg: #FAF7F0;
+  --color-bg-subtle: #F3ECE1;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #FDF9F3;
+  --color-border: #E8DFD3;
+  --color-border-subtle: #F0EAE1;
+  
+  --color-text-main: #2A2118;
+  --color-text-secondary: #6B5E52;
+  --color-text-muted: #9E9184;
+  
+  --color-accent-teal: #1F8A80;
+  --color-accent-terracotta: #C85A32;
+  --color-accent-sage: #4E785C;
+  --color-status-overdue: #C53030;
+  
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  
+  --shadow-sm: 0 1px 3px rgba(42, 33, 24, 0.05);
+  --shadow-md: 0 4px 14px rgba(42, 33, 24, 0.08);
+  --shadow-book: 0 6px 18px rgba(42, 33, 24, 0.12), 0 1px 3px rgba(42, 33, 24, 0.08);
+  --shadow-hover: 0 12px 28px rgba(217, 119, 6, 0.18), 0 4px 10px rgba(42, 33, 24, 0.08);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: all 0.18s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-subtle);
+}
+::-webkit-scrollbar-thumb {
+  background: #D9CEBF;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-amber-primary);
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
