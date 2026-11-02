@@ -2,7 +2,9 @@
 
 > A warm amber-toned modern library circulation and book borrowing management system inspired by classic literary design and Libib aesthetics. Built with **Svelte 5**, **Supabase PostgreSQL**, and deployed on **Vercel**.
 
-![BOOKING-AMO Preview](https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80)
+🌐 **Live Production URL**: [https://booking-amo.vercel.app](https://booking-amo.vercel.app)  
+📁 **GitHub Repository**: [https://github.com/MarkieTechviber/BOOKING-AMO](https://github.com/MarkieTechviber/BOOKING-AMO)  
+🗄️ **Supabase Database**: Connected to Project `ajkzcocpptgfovrhjdsr` (`ajkzcocpptgfovrhjdsr.supabase.co`)
 
 ---
 
