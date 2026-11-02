@@ -10,22 +10,29 @@
   import ReportsView from './lib/components/ReportsView.svelte';
   import SettingsView from './lib/components/SettingsView.svelte';
   import BookModal from './lib/components/BookModal.svelte';
+  import BorrowerModal from './lib/components/BorrowerModal.svelte';
   import BorrowModal from './lib/components/BorrowModal.svelte';
   import confetti from 'canvas-confetti';
 
   import { 
     fetchBooks, 
+    fetchBorrowers,
     fetchBorrowRecords, 
     addBook, 
     updateBook, 
     deleteBook, 
+    addBorrower,
+    updateBorrower,
+    deleteBorrower,
     borrowBook, 
+    updateBorrowRecord,
     returnBook, 
     deleteBorrowRecord 
   } from './lib/bookService';
 
   // State
   let books = $state([]);
+  let borrowers = $state([]);
   let borrowRecords = $state([]);
   let loading = $state(true);
   let error = $state(null);
@@ -39,13 +46,20 @@
   let availabilityFilter = $state('all'); // 'all', 'available', 'borrowed'
   let sortBy = $state('title_asc');
 
-  // Modals
+  // Book Modal
   let isBookModalOpen = $state(false);
   let isEditMode = $state(false);
   let selectedBookForEdit = $state(null);
 
+  // Borrower Modal (CRUD)
+  let isBorrowerModalOpen = $state(false);
+  let isBorrowerEditMode = $state(false);
+  let selectedBorrowerForEdit = $state(null);
+
+  // Borrow Checkout Modal
   let isBorrowModalOpen = $state(false);
   let selectedBookForBorrow = $state(null);
+  let preselectedBorrower = $state(null);
 
   // Toast notification
   let toastMsg = $state(null);
@@ -59,16 +73,18 @@
     }, 3500);
   }
 
-  // Load Data
+  // Load All Relational Data from Supabase
   async function loadData() {
     try {
       loading = true;
       error = null;
-      const [fetchedBooks, fetchedRecords] = await Promise.all([
+      const [fetchedBooks, fetchedBorrowers, fetchedRecords] = await Promise.all([
         fetchBooks(),
+        fetchBorrowers(),
         fetchBorrowRecords()
       ]);
       books = fetchedBooks;
+      borrowers = fetchedBorrowers;
       borrowRecords = fetchedRecords;
     } catch (err) {
       console.error('Error loading data:', err);
@@ -90,6 +106,11 @@
     }
     return Array.from(set).sort();
   });
+
+  // Available books for borrowing
+  const availableBooksList = $derived(
+    books.filter(b => (b.available_copies || 0) > 0)
+  );
 
   // Extract letters that currently have books
   const lettersWithBooks = $derived(() => {
@@ -172,17 +193,18 @@
       groups[first].push(book);
     }
 
-    // Sort group keys alphabetically
     return Object.keys(groups).sort().map(letter => ({
       letter,
       items: groups[letter]
     }));
   });
 
-  // Active loans count
-  const activeLoansCount = $derived(borrowRecords.filter(r => r.status === 'borrowed').length);
+  // Unreturned books count (both borrowed + overdue)
+  const unreturnedCount = $derived(borrowRecords.filter(r => r.status !== 'returned').length);
 
-  // Handlers
+  /* =========================================================
+     MODULE A HANDLERS: BOOK MANAGEMENT (CRUD)
+     ========================================================= */
   function openAddModal() {
     isEditMode = false;
     selectedBookForEdit = null;
@@ -195,19 +217,14 @@
     isBookModalOpen = true;
   }
 
-  function openBorrowModal(book) {
-    selectedBookForBorrow = book;
-    isBorrowModalOpen = true;
-  }
-
   async function handleSaveBook(payload) {
     try {
       if (isEditMode && payload.id) {
         await updateBook(payload.id, payload);
-        showToast(`✓ Updated "${payload.title}"`);
+        showToast(`✓ Updated book "${payload.title}"`);
       } else {
         await addBook(payload);
-        showToast(`✓ Added "${payload.title}" to collection`);
+        showToast(`✓ Added "${payload.title}" to catalog`);
         confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
       }
       isBookModalOpen = false;
@@ -219,16 +236,77 @@
 
   async function handleDeleteBook(id) {
     const book = books.find(b => b.id === id);
-    if (!confirm(`Are you sure you want to remove "${book?.title || 'this book'}" from the catalog?`)) {
+    if (!confirm(`Are you sure you want to delete "${book?.title || 'this book'}" from the catalog?`)) {
       return;
     }
     try {
       await deleteBook(id);
-      showToast(`Removed from catalog`);
+      showToast(`✓ Deleted "${book?.title || 'book'}" from catalog`);
       await loadData();
     } catch (err) {
       alert(`Error deleting book: ${err.message}`);
     }
+  }
+
+  /* =========================================================
+     MODULE B HANDLERS: BORROWERS (CRUD)
+     ========================================================= */
+  function openAddBorrowerModal() {
+    isBorrowerEditMode = false;
+    selectedBorrowerForEdit = null;
+    isBorrowerModalOpen = true;
+  }
+
+  function openEditBorrowerModal(borrower) {
+    isBorrowerEditMode = true;
+    selectedBorrowerForEdit = borrower;
+    isBorrowerModalOpen = true;
+  }
+
+  async function handleSaveBorrower(payload) {
+    try {
+      if (isBorrowerEditMode && payload.id) {
+        await updateBorrower(payload.id, payload);
+        showToast(`✓ Updated borrower "${payload.full_name}"`);
+      } else {
+        await addBorrower(payload);
+        showToast(`✓ Registered borrower "${payload.full_name}"`);
+        confetti({ particleCount: 45, spread: 50, origin: { y: 0.8 } });
+      }
+      isBorrowerModalOpen = false;
+      await loadData();
+    } catch (err) {
+      alert(`Error saving borrower: ${err.message}`);
+    }
+  }
+
+  async function handleDeleteBorrower(id) {
+    const b = borrowers.find(x => x.id === id);
+    if (!confirm(`Remove borrower "${b?.full_name || 'this patron'}" from database?`)) {
+      return;
+    }
+    try {
+      await deleteBorrower(id);
+      showToast(`✓ Deleted borrower record`);
+      await loadData();
+    } catch (err) {
+      alert(`Error deleting borrower: ${err.message}`);
+    }
+  }
+
+  /* =========================================================
+     CIRCULATION HANDLERS: BORROW BOOKS & UNRETURNED TRACKING
+     ========================================================= */
+  function openBorrowModalForBook(book = null) {
+    selectedBookForBorrow = book;
+    preselectedBorrower = null;
+    isBorrowModalOpen = true;
+  }
+
+  function openBorrowModalForPatron(borrower) {
+    selectedBookForBorrow = null;
+    preselectedBorrower = borrower;
+    isBorrowModalOpen = true;
   }
 
   async function handleConfirmBorrow(checkoutData) {
@@ -241,17 +319,32 @@
         origin: { y: 0.6 },
         colors: ['#D97706', '#E08A3C', '#4E785C']
       });
-      showToast(`✓ Checked out to ${checkoutData.borrowerName}`);
+      showToast(`✓ Book borrowed by ${checkoutData.borrowerName}`);
       await loadData();
     } catch (err) {
       alert(`Checkout failed: ${err.message}`);
     }
   }
 
+  async function handleExtendLoan(record) {
+    try {
+      const currentDue = new Date(record.due_date);
+      currentDue.setDate(currentDue.getDate() + 7);
+      await updateBorrowRecord(record.id, {
+        due_date: currentDue.toISOString(),
+        status: currentDue > new Date() ? 'borrowed' : 'overdue'
+      });
+      showToast(`✓ Extended due date by 7 days for ${record.borrower_name}`);
+      await loadData();
+    } catch (err) {
+      alert(`Failed to extend due date: ${err.message}`);
+    }
+  }
+
   async function handleReturnBook(recordId, bookId) {
     try {
       await returnBook(recordId, bookId);
-      showToast(`✓ Book returned to circulation shelf`);
+      showToast(`✓ Book marked as returned & restocked`);
       await loadData();
     } catch (err) {
       alert(`Failed to return book: ${err.message}`);
@@ -259,10 +352,10 @@
   }
 
   async function handleDeleteBorrowRecord(recordId) {
-    if (!confirm('Delete this circulation record?')) return;
+    if (!confirm('Delete this borrowing record?')) return;
     try {
       await deleteBorrowRecord(recordId);
-      showToast('Record removed');
+      showToast('✓ Borrowing record deleted');
       await loadData();
     } catch (err) {
       alert(`Failed to delete record: ${err.message}`);
@@ -276,8 +369,10 @@
     {activeTab}
     onSelectTab={(tab) => activeTab = tab}
     onOpenAddBook={openAddModal}
+    onOpenBorrowBook={() => openBorrowModalForBook(null)}
     booksCount={books.length}
-    {activeLoansCount}
+    {unreturnedCount}
+    borrowersCount={borrowers.length}
   />
 
   <!-- Main Work Area -->
@@ -315,7 +410,7 @@
         {:else if processedBooks().length === 0}
           <div class="empty-state">
             <div class="empty-icon">📖</div>
-            <h3>No Books Match Your Criteria</h3>
+            <h3>No Books Match Your Search</h3>
             <p>Try clearing your search query, choosing another letter, or adding a new title.</p>
             <button class="add-prompt-btn" onclick={openAddModal}>+ Add New Book</button>
           </div>
@@ -331,7 +426,7 @@
                     {#each group.items as book (book.id)}
                       <BookCard 
                         {book}
-                        onBorrow={openBorrowModal}
+                        onBorrow={openBorrowModalForBook}
                         onEdit={openEditModal}
                         onDelete={handleDeleteBook}
                       />
@@ -344,7 +439,7 @@
             <div class="table-view-wrap animate-fade-in">
               <BookTable 
                 books={processedBooks()}
-                onBorrow={openBorrowModal}
+                onBorrow={openBorrowModalForBook}
                 onEdit={openEditModal}
                 onDelete={handleDeleteBook}
               />
@@ -356,15 +451,30 @@
     {:else if activeTab === 'lending'}
       <LendingDesk 
         {borrowRecords}
+        onOpenBorrowModal={() => openBorrowModalForBook(null)}
         onReturnBook={handleReturnBook}
+        onExtendLoan={handleExtendLoan}
         onDeleteRecord={handleDeleteBorrowRecord}
       />
 
     {:else if activeTab === 'patrons'}
-      <PatronsView {borrowRecords} />
+      <PatronsView 
+        {borrowers}
+        {borrowRecords}
+        onOpenAddBorrower={openAddBorrowerModal}
+        onOpenEditBorrower={openEditBorrowerModal}
+        onDeleteBorrower={handleDeleteBorrower}
+        onBorrowForPatron={openBorrowModalForPatron}
+        onReturnBook={handleReturnBook}
+      />
 
     {:else if activeTab === 'reports'}
-      <ReportsView {books} {borrowRecords} />
+      <ReportsView 
+        {books} 
+        {borrowers}
+        {borrowRecords} 
+        onNavigateTab={(t) => activeTab = t}
+      />
 
     {:else if activeTab === 'settings'}
       <SettingsView onReseedData={loadData} />
@@ -372,7 +482,7 @@
   </main>
 </div>
 
-<!-- Modals -->
+<!-- Module A: Book CRUD Modal -->
 <BookModal 
   isOpen={isBookModalOpen}
   editMode={isEditMode}
@@ -381,9 +491,22 @@
   onClose={() => isBookModalOpen = false}
 />
 
+<!-- Module B: Borrower CRUD Modal -->
+<BorrowerModal 
+  isOpen={isBorrowerModalOpen}
+  editMode={isBorrowerEditMode}
+  initialBorrower={selectedBorrowerForEdit}
+  onSave={handleSaveBorrower}
+  onClose={() => isBorrowerModalOpen = false}
+/>
+
+<!-- Circulation: Borrow Book Modal -->
 <BorrowModal 
   isOpen={isBorrowModalOpen}
   book={selectedBookForBorrow}
+  {preselectedBorrower}
+  availableBooks={availableBooksList}
+  {borrowers}
   onConfirm={handleConfirmBorrow}
   onClose={() => isBorrowModalOpen = false}
 />

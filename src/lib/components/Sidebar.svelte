@@ -2,9 +2,11 @@
   let { 
     activeTab = 'library', 
     onSelectTab, 
-    onOpenAddBook, 
+    onOpenAddBook,
+    onOpenBorrowBook,
     booksCount = 0, 
-    activeLoansCount = 0 
+    unreturnedCount = 0,
+    borrowersCount = 0
   } = $props();
 </script>
 
@@ -18,13 +20,13 @@
     </div>
     <div class="brand-text">
       <span class="brand-name">booking-amo</span>
-      <span class="brand-sub">edition 2.0</span>
+      <span class="brand-sub">LMS • FULL CRUD</span>
     </div>
   </div>
 
   <!-- Primary Navigation -->
   <nav class="nav-menu">
-    <div class="nav-section-label">CATALOG</div>
+    <div class="nav-section-label">A. BOOK MANAGEMENT</div>
     
     <button 
       class="nav-item" 
@@ -38,7 +40,7 @@
           <path d="M6 10h10"/>
         </svg>
       </span>
-      <span class="nav-label">Library</span>
+      <span class="nav-label">Book Catalog</span>
       {#if booksCount > 0}
         <span class="nav-badge">{booksCount}</span>
       {/if}
@@ -54,28 +56,10 @@
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
       </span>
-      <span class="nav-label">Add Items</span>
+      <span class="nav-label">Add Book</span>
     </button>
 
-    <div class="nav-section-label" style="margin-top: 18px;">CIRCULATION</div>
-
-    <button 
-      class="nav-item" 
-      class:active={activeTab === 'lending'}
-      onclick={() => onSelectTab('lending')}
-    >
-      <span class="nav-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      </span>
-      <span class="nav-label">Lending</span>
-      {#if activeLoansCount > 0}
-        <span class="nav-badge amber-badge">{activeLoansCount}</span>
-      {/if}
-    </button>
+    <div class="nav-section-label" style="margin-top: 16px;">B. BORROWER MANAGEMENT</div>
 
     <button 
       class="nav-item" 
@@ -90,10 +74,46 @@
           <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       </span>
-      <span class="nav-label">Patrons</span>
+      <span class="nav-label">Borrowers (CRUD)</span>
+      {#if borrowersCount > 0}
+        <span class="nav-badge">{borrowersCount}</span>
+      {/if}
     </button>
 
-    <div class="nav-section-label" style="margin-top: 18px;">INSIGHTS</div>
+    <button 
+      class="nav-item" 
+      class:active={activeTab === 'lending'}
+      onclick={() => onSelectTab('lending')}
+    >
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </span>
+      <span class="nav-label">Unreturned Books</span>
+      {#if unreturnedCount > 0}
+        <span class="nav-badge amber-badge">{unreturnedCount}</span>
+      {/if}
+    </button>
+
+    <button 
+      class="nav-item action-btn" 
+      onclick={onOpenBorrowBook}
+    >
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3h5v5"/>
+          <path d="M8 3H3v5"/>
+          <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/>
+          <path d="m15 9 6-6"/>
+        </svg>
+      </span>
+      <span class="nav-label">Borrow a Book</span>
+    </button>
+
+    <div class="nav-section-label" style="margin-top: 16px;">ARCHITECTURE & FLOW</div>
 
     <button 
       class="nav-item" 
@@ -107,7 +127,7 @@
           <line x1="6" y1="20" x2="6" y2="14"/>
         </svg>
       </span>
-      <span class="nav-label">Reports</span>
+      <span class="nav-label">System & Reports</span>
     </button>
 
     <button 
@@ -129,15 +149,15 @@
   <div class="sidebar-footer">
     <div class="status-indicator">
       <span class="status-dot"></span>
-      <span class="status-label">Supabase Live</span>
+      <span class="status-label">Supabase DB Connected</span>
     </div>
-    <div class="version-tag">Warm Amber Edition</div>
+    <div class="version-tag">Svelte 5 • Warm Amber</div>
   </div>
 </aside>
 
 <style>
   .sidebar {
-    width: 220px;
+    width: 235px;
     height: 100vh;
     background-color: var(--color-surface);
     border-right: 1px solid var(--color-border);
@@ -154,7 +174,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 6px 10px 20px 8px;
+    padding: 6px 10px 18px 8px;
     border-bottom: 1px solid var(--color-border-subtle);
   }
 
@@ -185,9 +205,9 @@
   }
 
   .brand-sub {
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     color: var(--color-amber-primary);
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
@@ -196,26 +216,26 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding-top: 16px;
+    gap: 3px;
+    padding-top: 14px;
   }
 
   .nav-section-label {
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: 700;
     color: var(--color-text-muted);
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     padding: 0 10px 4px;
   }
 
   .nav-item {
     display: flex;
     align-items: center;
-    gap: 11px;
-    padding: 9px 12px;
+    gap: 10px;
+    padding: 8px 12px;
     border-radius: var(--radius-md);
     color: var(--color-text-secondary);
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     font-weight: 500;
     text-align: left;
     width: 100%;
@@ -260,8 +280,8 @@
   }
 
   .nav-badge {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     padding: 1px 7px;
     background: var(--color-bg-subtle);
     color: var(--color-text-secondary);
@@ -278,14 +298,14 @@
     border-top: 1px solid var(--color-border-subtle);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   .status-indicator {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-size: 0.76rem;
+    font-size: 0.75rem;
     color: var(--color-accent-sage);
     font-weight: 600;
   }
@@ -300,7 +320,7 @@
   }
 
   .version-tag {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     color: var(--color-text-muted);
   }
 

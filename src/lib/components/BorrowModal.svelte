@@ -2,91 +2,225 @@
   let { 
     isOpen = false, 
     book = null, 
+    preselectedBorrower = null,
+    availableBooks = [],
+    borrowers = [],
     onConfirm, 
     onClose 
   } = $props();
 
+  let selectedBookId = $state('');
+  let borrowerMode = $state('existing'); // 'existing' or 'new'
+  let selectedBorrowerId = $state('');
+
   let borrowerName = $state('');
   let borrowerEmail = $state('');
+  let borrowerPhone = $state('');
+  let borrowerDepartment = $state('General Patron');
   let days = $state('14');
   let notes = $state('');
 
+  $effect(() => {
+    if (isOpen) {
+      if (book) {
+        selectedBookId = book.id;
+      } else if (availableBooks.length > 0) {
+        selectedBookId = availableBooks[0].id;
+      }
+
+      if (preselectedBorrower) {
+        borrowerMode = 'existing';
+        selectedBorrowerId = preselectedBorrower.id;
+        borrowerName = preselectedBorrower.full_name;
+        borrowerEmail = preselectedBorrower.email || '';
+        borrowerPhone = preselectedBorrower.phone || '';
+        borrowerDepartment = preselectedBorrower.department || 'General Patron';
+      } else if (borrowers.length > 0) {
+        borrowerMode = 'existing';
+        const firstActive = borrowers.find(b => b.status !== 'suspended') || borrowers[0];
+        selectedBorrowerId = firstActive.id;
+        borrowerName = firstActive.full_name;
+        borrowerEmail = firstActive.email || '';
+        borrowerPhone = firstActive.phone || '';
+        borrowerDepartment = firstActive.department || 'General Patron';
+      } else {
+        borrowerMode = 'new';
+        selectedBorrowerId = '';
+        borrowerName = '';
+        borrowerEmail = '';
+        borrowerPhone = '';
+      }
+    }
+  });
+
+  function handleSelectExistingBorrower(e) {
+    const id = e.target.value;
+    selectedBorrowerId = id;
+    const found = borrowers.find(b => b.id === id);
+    if (found) {
+      borrowerName = found.full_name;
+      borrowerEmail = found.email || '';
+      borrowerPhone = found.phone || '';
+      borrowerDepartment = found.department || 'General Patron';
+    }
+  }
+
+  const activeBook = $derived(
+    book || availableBooks.find(b => b.id === selectedBookId) || null
+  );
+
   function handleSubmit(e) {
     e.preventDefault();
-    if (!borrowerName.trim() || !book) return;
+    if (!selectedBookId) return;
+    if (!borrowerName.trim()) return;
 
     onConfirm({
-      bookId: book.id,
+      bookId: selectedBookId,
+      borrowerId: borrowerMode === 'existing' ? selectedBorrowerId : null,
       borrowerName: borrowerName.trim(),
       borrowerEmail: borrowerEmail.trim(),
+      borrowerPhone: borrowerPhone.trim(),
+      borrowerDepartment,
       days: Number(days),
       notes: notes.trim()
     });
 
-    borrowerName = '';
-    borrowerEmail = '';
     notes = '';
   }
 </script>
 
-{#if isOpen && book}
+{#if isOpen}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-backdrop animate-fade-in" onclick={onClose}>
     <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h3 class="modal-title">Circulation Checkout</h3>
+        <div>
+          <span class="module-pill">CIRCULATION • BORROW BOOKS</span>
+          <h3 class="modal-title">Issue Book to Borrower</h3>
+        </div>
         <button class="close-btn" onclick={onClose}>✕</button>
       </div>
 
-      <!-- Book snapshot preview -->
-      <div class="book-preview-strip">
-        <div class="preview-cover">
-          {#if book.cover_url}
-            <img src={book.cover_url} alt={book.title} />
-          {:else}
-            <span>📖</span>
-          {/if}
-        </div>
-        <div class="preview-meta">
-          <div class="preview-title">{book.title}</div>
-          <div class="preview-author">{book.author}</div>
-          <div class="preview-stock">
-            Available to loan: <strong>{book.available_copies} of {book.total_copies}</strong> copies
-          </div>
-        </div>
-      </div>
-
       <form onsubmit={handleSubmit} class="borrow-form">
-        <div class="form-group">
-          <label for="borrower-name">Patron / Borrower Name *</label>
-          <input 
-            id="borrower-name" 
-            type="text" 
-            required 
-            placeholder="e.g. Florence Miller" 
-            bind:value={borrowerName} 
-          />
+        <!-- Step 1: Select or Preview Book -->
+        {#if !book}
+          <div class="form-group">
+            <label for="select-book">Select Available Book *</label>
+            <select id="select-book" bind:value={selectedBookId} required>
+              {#each availableBooks as b}
+                <option value={b.id}>
+                  {b.title} — {b.author} ({b.available_copies}/{b.total_copies} available)
+                </option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+
+        {#if activeBook}
+          <div class="book-preview-strip">
+            <div class="preview-cover">
+              {#if activeBook.cover_url}
+                <img src={activeBook.cover_url} alt={activeBook.title} />
+              {:else}
+                <span>📖</span>
+              {/if}
+            </div>
+            <div class="preview-meta">
+              <div class="preview-title">{activeBook.title}</div>
+              <div class="preview-author">{activeBook.author}</div>
+              <div class="preview-stock">
+                Available on shelf: <strong>{activeBook.available_copies} of {activeBook.total_copies}</strong> copies
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Step 2: Select Registered Borrower or New Borrower -->
+        <div class="borrower-mode-toggle">
+          <button
+            type="button"
+            class="mode-btn"
+            class:active={borrowerMode === 'existing'}
+            onclick={() => borrowerMode = 'existing'}
+          >
+            Select Registered Borrower ({borrowers.length})
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            class:active={borrowerMode === 'new'}
+            onclick={() => {
+              borrowerMode = 'new';
+              selectedBorrowerId = '';
+              borrowerName = '';
+              borrowerEmail = '';
+              borrowerPhone = '';
+            }}
+          >
+            + New Borrower
+          </button>
         </div>
 
-        <div class="form-group">
-          <label for="borrower-email">Patron Email / Contact</label>
-          <input 
-            id="borrower-email" 
-            type="email" 
-            placeholder="florence@example.com" 
-            bind:value={borrowerEmail} 
-          />
-        </div>
+        {#if borrowerMode === 'existing' && borrowers.length > 0}
+          <div class="form-group">
+            <label for="existing-borrower">Registered Borrower *</label>
+            <select 
+              id="existing-borrower" 
+              value={selectedBorrowerId} 
+              onchange={handleSelectExistingBorrower}
+            >
+              {#each borrowers as b}
+                <option value={b.id} disabled={b.status === 'suspended'}>
+                  {b.full_name} ({b.member_id}) — {b.department} {b.status === 'suspended' ? '[SUSPENDED]' : ''}
+                </option>
+              {/each}
+            </select>
+          </div>
+        {:else}
+          <div class="form-row-two">
+            <div class="form-group">
+              <label for="borrower-name">Borrower Full Name *</label>
+              <input 
+                id="borrower-name" 
+                type="text" 
+                required 
+                placeholder="e.g. Florence Miller" 
+                bind:value={borrowerName} 
+              />
+            </div>
 
+            <div class="form-group">
+              <label for="borrower-phone">Phone Number</label>
+              <input 
+                id="borrower-phone" 
+                type="text" 
+                placeholder="+1 (555) 234-5678" 
+                bind:value={borrowerPhone} 
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="borrower-email">Borrower Email</label>
+            <input 
+              id="borrower-email" 
+              type="email" 
+              placeholder="florence@example.com" 
+              bind:value={borrowerEmail} 
+            />
+          </div>
+        {/if}
+
+        <!-- Step 3: Loan Duration -->
         <div class="form-group">
-          <label for="loan-duration">Loan Duration</label>
+          <span class="field-label">Loan Period (Tracks Unreturned After Due Date)</span>
           <div class="duration-chips">
             {#each [
               { val: '7', label: '7 Days' },
               { val: '14', label: '14 Days (Standard)' },
               { val: '21', label: '21 Days' },
-              { val: '30', label: '30 Days (Extended)' }
+              { val: '30', label: '30 Days' }
             ] as option}
               <button 
                 type="button" 
@@ -101,19 +235,19 @@
         </div>
 
         <div class="form-group">
-          <label for="loan-notes">Checkout Notes / Desk Memo</label>
+          <label for="loan-notes">Circulation Notes / Remarks</label>
           <input 
             id="loan-notes" 
             type="text" 
-            placeholder="Special loan, condition notes, or patron phone..." 
+            placeholder="Special loan, book condition, or desk memo..." 
             bind:value={notes} 
           />
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn-cancel" onclick={onClose}>Cancel</button>
-          <button type="submit" class="btn-checkout">
-            ✓ Complete Checkout
+          <button type="submit" class="btn-checkout" disabled={!activeBook}>
+            ✓ Record Borrowed Book
           </button>
         </div>
       </form>
@@ -140,19 +274,30 @@
     border: 1px solid var(--color-border);
     box-shadow: 0 20px 40px rgba(42, 33, 24, 0.2);
     width: 100%;
-    max-width: 480px;
+    max-width: 510px;
+    max-height: 92vh;
+    overflow-y: auto;
     padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
   }
 
   .modal-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     border-bottom: 1px solid var(--color-border-subtle);
     padding-bottom: 10px;
+  }
+
+  .module-pill {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--color-amber-primary);
+    letter-spacing: 0.06em;
+    display: block;
+    margin-bottom: 2px;
   }
 
   .modal-title {
@@ -180,12 +325,12 @@
     background: var(--color-bg);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .preview-cover {
-    width: 42px;
-    height: 60px;
+    width: 40px;
+    height: 58px;
     border-radius: 3px;
     overflow: hidden;
     background: #E0D6C8;
@@ -210,14 +355,14 @@
 
   .preview-title {
     font-family: var(--font-display);
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 700;
     color: var(--color-text-main);
     line-height: 1.2;
   }
 
   .preview-author {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     color: var(--color-text-secondary);
   }
 
@@ -228,38 +373,68 @@
     margin-top: 2px;
   }
 
+  .borrower-mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    gap: 4px;
+  }
+
+  .mode-btn {
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  .mode-btn.active {
+    background: #FFFFFF;
+    color: var(--color-amber-hover);
+    box-shadow: var(--shadow-sm);
+  }
+
   .borrow-form {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+  }
+
+  .form-row-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
   }
 
-  label {
-    font-size: 0.75rem;
+  label, .field-label {
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
 
-  input {
-    padding: 9px 12px;
+  input, select {
+    padding: 8px 12px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-bg);
-    font-size: 0.85rem;
+    font-size: 0.84rem;
     color: var(--color-text-main);
     outline: none;
     transition: all 0.18s ease;
   }
 
-  input:focus {
+  input:focus, select:focus {
     border-color: var(--color-amber-primary);
     background: #FFFFFF;
     box-shadow: 0 0 0 3px var(--color-amber-light);
@@ -293,7 +468,7 @@
     justify-content: flex-end;
     gap: 10px;
     border-top: 1px solid var(--color-border-subtle);
-    padding-top: 14px;
+    padding-top: 12px;
     margin-top: 4px;
   }
 

@@ -13,10 +13,11 @@
   let isbn = $state('');
   let published_year = $state(new Date().getFullYear());
   let total_copies = $state(1);
+  let available_copies = $state(1);
   let cover_url = $state('');
   let description = $state('');
 
-  const genres = ['Fiction', 'Classics', 'Graphic Novel', 'Science & Tech', 'Drama', 'Poetry & Arts', 'Philosophy', 'History', 'Biography'];
+  const genres = ['Fiction', 'Classics', 'Graphic Novel', 'Science & Tech', 'Sci-Fi', 'Drama', 'Poetry & Arts', 'Philosophy', 'History', 'Biography'];
 
   const coverPresets = [
     { label: 'Minimalist Clean', url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80' },
@@ -33,7 +34,8 @@
       genre = initialBook.genre || 'Fiction';
       isbn = initialBook.isbn || '';
       published_year = initialBook.published_year || '';
-      total_copies = initialBook.total_copies || 1;
+      total_copies = initialBook.total_copies ?? 1;
+      available_copies = initialBook.available_copies ?? 1;
       cover_url = initialBook.cover_url || '';
       description = initialBook.description || '';
     } else {
@@ -43,6 +45,7 @@
       isbn = '';
       published_year = new Date().getFullYear();
       total_copies = 1;
+      available_copies = 1;
       cover_url = '';
       description = '';
     }
@@ -52,6 +55,11 @@
     e.preventDefault();
     if (!title.trim() || !author.trim()) return;
 
+    const total = Math.max(1, Number(total_copies) || 1);
+    const avail = editMode
+      ? Math.min(total, Math.max(0, Number(available_copies)))
+      : total;
+
     onSave({
       ...(editMode && initialBook ? { id: initialBook.id } : {}),
       title: title.trim(),
@@ -59,7 +67,8 @@
       genre,
       isbn: isbn.trim(),
       published_year: Number(published_year) || null,
-      total_copies: Number(total_copies) || 1,
+      total_copies: total,
+      available_copies: avail,
       cover_url: cover_url.trim(),
       description: description.trim()
     });
@@ -72,16 +81,19 @@
   <div class="modal-backdrop animate-fade-in" onclick={onClose}>
     <div class="modal-dialog" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h3 class="modal-title">
-          {editMode ? 'Edit Book Record' : 'Add New Book to Collection'}
-        </h3>
+        <div>
+          <span class="module-pill">MODULE A • BOOK MANAGEMENT (CRUD)</span>
+          <h3 class="modal-title">
+            {editMode ? 'Update Book Information' : 'Add New Book to Catalog'}
+          </h3>
+        </div>
         <button class="close-btn" onclick={onClose}>✕</button>
       </div>
 
       <form onsubmit={handleSubmit} class="modal-form">
         <div class="form-grid">
           <div class="form-group full">
-            <label for="book-title">Title *</label>
+            <label for="book-title">Book Title *</label>
             <input 
               id="book-title" 
               type="text" 
@@ -103,7 +115,7 @@
           </div>
 
           <div class="form-group half">
-            <label for="book-genre">Genre</label>
+            <label for="book-genre">Genre / Category</label>
             <select id="book-genre" bind:value={genre}>
               {#each genres as g}
                 <option value={g}>{g}</option>
@@ -112,7 +124,7 @@
           </div>
 
           <div class="form-group half">
-            <label for="book-isbn">ISBN / Catalog ID</label>
+            <label for="book-isbn">ISBN / Catalog Code</label>
             <input 
               id="book-isbn" 
               type="text" 
@@ -132,15 +144,28 @@
           </div>
 
           <div class="form-group quarter">
-            <label for="book-copies">Copies</label>
+            <label for="book-copies">Total Copies</label>
             <input 
               id="book-copies" 
               type="number" 
               min="1" 
-              max="50" 
+              max="100" 
               bind:value={total_copies} 
             />
           </div>
+
+          {#if editMode}
+            <div class="form-group full">
+              <label for="book-avail">Available Copies on Shelf (Max: {total_copies})</label>
+              <input 
+                id="book-avail" 
+                type="number" 
+                min="0" 
+                max={total_copies} 
+                bind:value={available_copies} 
+              />
+            </div>
+          {/if}
 
           <!-- Cover Image Selector -->
           <div class="form-group full">
@@ -153,7 +178,7 @@
             />
             
             <div class="preset-covers">
-              <span class="preset-label">Or choose an aesthetic preset:</span>
+              <span class="preset-label">Or choose an aesthetic cover preset:</span>
               <div class="preset-buttons">
                 {#each coverPresets as preset}
                   <button 
@@ -182,7 +207,7 @@
         <div class="modal-footer">
           <button type="button" class="btn-cancel" onclick={onClose}>Cancel</button>
           <button type="submit" class="btn-submit">
-            {editMode ? 'Save Changes' : 'Add to Library'}
+            {editMode ? '✓ Update Book Record' : '+ Add Book to Catalog'}
           </button>
         </div>
       </form>
@@ -221,9 +246,18 @@
   .modal-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     border-bottom: 1px solid var(--color-border-subtle);
     padding-bottom: 12px;
+  }
+
+  .module-pill {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--color-amber-primary);
+    letter-spacing: 0.06em;
+    display: block;
+    margin-bottom: 2px;
   }
 
   .modal-title {
@@ -268,7 +302,7 @@
   .form-group.quarter { grid-column: span 1; }
 
   label {
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     font-weight: 600;
     color: var(--color-text-secondary);
     text-transform: uppercase;
